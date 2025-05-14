@@ -1,0 +1,221 @@
+---
+title: "Statistical Analysis in R - York Footfall Data Analysis Report"
+author: "Joao Marques Hassun"
+date: "2024-10-19"
+output: html_document
+---
+
+---
+
+## Section 1
+
+# Load the libraries.
+
+```{r setup, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(gridExtra)
+library(kableExtra)
+
+```
+
+This report fulfills the request of determining which is the best location to place stalls in order to gauge daily footfall.
+
+1. Load in the data and check it for integrity/quality.
+
+2. Provide a summary table that shows the following for each location where footfall was measured: 
+  - The date of the first and last day when footfall was measured at this location 
+  - The mean daily footfall 
+  - The standard deviation of the daily footfall 
+  - The highest daily footfall 
+  - The lowest daily footfall
+
+3. Plot the distribution of footfall across all days in the dataset. This should show the distributions separated by the locations where footfall is measured.
+
+4. Perform a t-test to compare the footfall on Coney Street to Stonegate.
+
+5. Perform an additional t-test to compare the footfall on Coney Street to Stonegate only on weekends.
+
+---
+
+## Data Dictionary
+
+This data was captured by cameras that automatically measure the number of people who walk past a certain location: the 'footfall'. The variables are described in the table below:
+
+Variable | Description
+------------- | -------------
+Date| The data in which the data was recorded
+SiteName | The name of the site in which the data was captured, which is York for all.
+LocationName| The specific location in which the data was recorded
+WeekDay| The day of the week in which the data was recorded
+TotalCount| The total count of 'Footfall' recorded 
+Recording_ID| The unique identifier for people leaving footfall
+Footfall| The measure of the number of people who walk past a certain location
+
+---
+
+# Read the csv file and assign it to a variable.
+
+```{r}
+
+Footfall <- read_csv("York_Footfall_data.csv")
+
+```
+
+# Plot the data to check the distribution.
+
+```{r, warning=FALSE, message=FALSE}
+
+FootfallScatterPlot <- ggplot(data = Footfall) + geom_point(mapping = aes(x = Date, y = TotalCount, color = LocationName)) + labs(title = "Distribution Scatter Plot for Footfall", x = "Date", y = "Total Count", color = "Location Name") + theme(plot.title = element_text(hjust = 0.5))
+
+FootfallScatterPlot
+
+```
+
+# Create a summary of the data to check its integrity.
+
+```{r}
+
+summary(Footfall)
+
+# The summary reveals that the SiteName, LocationName and WeekDay columns all have the expected amount of values.
+
+# Creating a summary enables the identification of NA values in the TotalCount and Recording_ID columns.
+
+# To check that the remaining columns also have the expected amount of values (8204), the length function is used.
+
+length(Footfall$Date)
+
+length(Footfall$TotalCount)
+
+length(Footfall$Recording_ID)
+
+```
+
+# Data cleaning.
+
+```{r}
+# Considering how far apart min and max values are for the TotalCount column, we replace NAs with the median. 
+
+# Since Recording_ID is an identification measure to each individual leaving footfall, it is not necessary to replace or remove its NAs.
+
+Footfall$TotalCount[is.na(Footfall$TotalCount)] <- median(Footfall$TotalCount, na.rm = TRUE)
+
+# Display Footfall's summary again to verify that the NAs present in Total Count were replaced with the median.
+
+summary(Footfall)
+
+```
+
+# Create a summary table which displays information for each location. 
+
+```{r}
+
+Summary_Footfall <- Footfall %>%
+  group_by(LocationName) %>%
+  summarise(
+    FirstDay = min(Date),
+    LastDay = max(Date),
+    MeanFootfall = round(mean(TotalCount), 0),
+    StandardDeviationFootfall = round(sd(TotalCount), 0),
+    MaxFootfall = max(TotalCount),
+    MinFootfall = min(TotalCount)
+  ) %>%
+  knitr::kable(col.names = c("Location Name", "First Date", "Last Date", "Mean Footfall", "Standard Deviation of Footfall", "Max Footfall", "Min Footfall"))
+
+# Since footfall is a discrete measure, the round function is used to transform continuous values into discrete values.
+
+Summary_Footfall
+
+```
+
+# Create a new dataframe with only the 2019 information.
+
+```{r}
+
+max(Footfall$Date) 
+
+# This function displays the last date in which footfall was measured, confirming the data does not extend post 2019.
+
+Data_2019 <- Footfall %>% 
+  filter(grepl(2019, Date)) 
+
+Data_2019
+
+```
+
+# Plot the distribution of footfall across all days in the dataset.
+
+```{r}
+
+ScatterPlotFootfall2019 <- ggplot(data=Data_2019) + geom_point(mapping=aes(x=TotalCount, y=Date, color = LocationName)) + facet_wrap(.~LocationName) + labs(title = "Scatter Plot for Footfall in 2019", x = "Total Count", y = "Date", color = "Location Name") + theme(plot.title = element_text(hjust = 0.5))
+
+ScatterPlotFootfall2019
+
+WeekDayScatterPlot2019 <- ggplot(data=Data_2019) + geom_point(mapping=aes(x=WeekDay, y=TotalCount, color = LocationName)) + facet_grid(LocationName~.) + labs(title = "Footfall Scatter Plot by Days in 2019", x = "Week Day", y = "Total Count", color = "Location Name") + theme(plot.title = element_text(hjust = 0.5))
+
+WeekDayScatterPlot2019
+
+```
+
+# Create a smaller dataframe with only the information regarding Coney Street and Stonegate to make the t-test process easier.
+
+```{r}
+
+ConeyStreet.vs.Stonegate <- Data_2019 %>%
+  filter(LocationName %in% c("Coney Street", "Stonegate")) %>%
+  select(LocationName, WeekDay, TotalCount)
+
+ConeyStreet.vs.Stonegate
+
+```
+
+# Perform a t-test to compare the footfall on Coney Street to Stonegate.
+
+```{r}
+
+CvS_t_test_result <- t.test(TotalCount ~ LocationName, data = ConeyStreet.vs.Stonegate)
+
+CvS_t_test_result
+
+```
+
+# Create a smaller dataframe with only the information regarding Coney Street and Stonegate on weekends to make the process for the additional t-test easier.
+
+```{r}
+
+ConeyStreet.vs.Stonegate.on.Weekends <- Data_2019 %>%
+  filter(LocationName %in% c("Coney Street", "Stonegate"),
+         WeekDay %in% c("Saturday", "Sunday")) %>%
+  select(LocationName, WeekDay, TotalCount)
+
+ConeyStreet.vs.Stonegate.on.Weekends
+
+```
+
+# Perform an additional t-test to compare the footfall on Coney Street to Stonegate on weekends.
+
+```{r}
+
+CvS_Weekend_t_test <- t.test(TotalCount ~ LocationName, data = ConeyStreet.vs.Stonegate.on.Weekends)
+
+CvS_Weekend_t_test
+
+```
+
+## Section 2
+
+This report presents the analysis conducted to determine the most optimal location for placing promotional stalls in York based on daily footfall data. The workflow included loading the relevant R libraries and the York Footfall dataset, validating data integrity, generating summary statistics, and conducting statistical tests.
+
+The dataset includes pedestrian traffic counts collected across six locations: Church Street, Coney Street, Micklegate, Parliament Street, Parliament Street at M&S, and Stonegate. Each record includes Date, SiteName, LocationName, WeekDay, TotalCount, and Recording_ID. Initial exploration revealed a few outliers in Stonegate during December 2017; however, since the analysis focuses solely on data from 2019, these were not excluded.
+
+Missing values were observed in the TotalCount and Recording_ID columns. To retain as much data as possible, TotalCount NAs were replaced with the median (16,990), considering the wide range between the minimum (402) and maximum (328,310). Since Recording_ID serves as a unique identifier, its NAs were left unchanged.
+
+Visual exploration of 2019 data indicated that Coney Street, Stonegate, and Parliament Street had the highest daily footfall counts, while Micklegate had the lowest. A t-test comparing daily footfall between Coney Street and Stonegate across the full week revealed that Coney Street had a significantly higher mean (M = 20,817.45) than Stonegate (M = 19,204.09);
+t(699.18) = 3.36, p < .05.
+This result suggests a statistically significant difference, supporting the recommendation of Coney Street for weekday stall placement.
+
+A second t-test, restricted to weekends, found that Stonegate's mean (M = 26,166.96) was slightly higher than Coney Street's (M = 25,863.37);
+t(203.88) = -0.29, p = .772.
+However, the result is not statistically significant, indicating no clear difference in weekend footfall between the two locations.
