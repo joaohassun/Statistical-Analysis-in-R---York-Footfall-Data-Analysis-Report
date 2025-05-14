@@ -33,3 +33,6 @@ The project investigates foot traffic patterns across different locations in Yor
   - **Weekend-only campaigns**
 - Clean, publication-ready visualisations
 - Designed for decision-making audiences with limited technical background
+
+> 📌 *Note: Due to data restrictions, the dataset used in this project is not publicly shareable.*
+
